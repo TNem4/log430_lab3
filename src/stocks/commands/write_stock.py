@@ -3,6 +3,7 @@ Product stocks (write-only model)
 SPDX - License - Identifier: LGPL - 3.0 - or -later
 Auteurs : Gabriel C. Ullmann, Fabio Petrillo, 2025
 """
+from stocks.models.product import Product
 from sqlalchemy import text
 from stocks.models.stock import Stock
 from db import get_redis_conn, get_sqlalchemy_session
@@ -67,10 +68,11 @@ def check_in_items_to_stock(session, order_items):
 
 def update_stock_redis(order_items, operation):
     """ Update stock quantities in Redis """
-    if not order_items:
-        return
     r = get_redis_conn()
     stock_keys = list(r.scan_iter("stock:*"))
+    if not order_items:
+        return
+    session = get_sqlalchemy_session()
     if stock_keys:
         pipeline = r.pipeline()
         for item in order_items:
@@ -80,7 +82,10 @@ def update_stock_redis(order_items, operation):
             else:
                 product_id = item['product_id']
                 quantity = item['quantity']
-            # TODO: ajoutez plus d'information sur l'article
+
+            product = session.query(Product).filter_by(id=product_id).first()
+            if not product:
+                continue
             current_stock = r.hget(f"stock:{product_id}", "quantity")
             current_stock = int(current_stock) if current_stock else 0
             
@@ -89,7 +94,12 @@ def update_stock_redis(order_items, operation):
             else:  
                 new_quantity = current_stock - quantity
             
-            pipeline.hset(f"stock:{product_id}", "quantity", new_quantity)
+            pipeline.hset(f"stock:{product_id}", mapping={
+                "name": product.name,
+                "sku": product.sku,
+                "price": product.price,
+                "quantity": new_quantity
+            })
         
         pipeline.execute()
     

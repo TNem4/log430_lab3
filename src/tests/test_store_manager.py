@@ -37,6 +37,7 @@ def test_stock_flow(client):
     assert response_stock.get_json()['quantity'] == 5
     # 3. Vérifiez le stock, votre article devra avoir 5 unités dans le stock (`GET /stocks/:id`)
     response_order = client.post('/orders', data=json.dumps({'user_id': 1, 'items': [{'product_id': data['product_id'], 'quantity': 2}]}), content_type='application/json')
+    print(f"Response order: {response_order.get_json()}", flush=True)
     assert response_order.status_code == 201
     # 4. Faites une commande de l'article que vous avez crée, 2 unités (`POST /orders`)
     response_stock_after_order = client.get(f'/stocks/{data["product_id"]}')
